@@ -5,6 +5,82 @@ date: "9/4/2020"
 output: rmarkdown::github_document
 ---
 
-## Project 1
+# Project 1
 
-Test commit for project 1.
+## Explaining what you did in the project and any findings you made.
+
+## You should also reflect on the process you went through for this project. Discuss things like:
+
+### What would you do differently in approaching the project?
+
+### what was the most difficult part of the logic and programming for you?
+
+### what are your big take-aways for future projects?
+
+### In your blog post, provide a link to your github pages repo
+
+Repo is <https://github.com/sdu-ncsu/st558project1.git>.
+Github pages is address is <https://sdu-ncsu.github.io/st558project1/>
+
+```{r message=FALSE, warning=FALSE}
+# devtools::install_github("r-dbi/bigrquery")
+library(tidyverse)
+library(httr)
+library(jsonlite);
+```
+
+
+```{r}
+# global values
+base_url_records <- "https://records.nhl.com/site/api"
+base_url_stats <- "https://statsapi.web.nhl.com/api/v1"
+
+
+```
+
+
+
+```{r}
+# franchise api function creation
+
+getAllFranchises <- function(...) {
+  tab_name <- "franchise"
+  full_url <- paste0(base_url_records, "/", tab_name)
+  
+  res <- content(GET(full_url), as="text")
+  resR <- fromJSON(res, flatten=TRUE)
+  
+  print(resR)
+}
+
+getTeamTotals <- function(...) {
+  tab_name <- "franchise-team-totals"
+  full_url <- paste0(base_url_records, "/", tab_name)
+  
+  res <- content(GET(full_url), as="text")
+  resR <- fromJSON(res, flatten=TRUE)
+  
+  print(resR)
+}
+
+
+getFranchise <- function(identifier,...) {
+  
+  if (!is.character(identifier) && !is.numeric(identifier)) {
+    stop("Invalid input type, please use either a character or number")
+  }
+  tab_name <- "franchises"
+  full_url <- paste0(base_url, "/", tab_name, "/", as.character(identifier))
+  
+  res <- content(GET(full_url), as="text")
+  resR <- fromJSON(res, flatten=TRUE)
+  
+  print(resR)
+}
+
+
+getAllFranchises()
+getTeamTotals()
+
+```
+
