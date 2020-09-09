@@ -33,7 +33,7 @@ library(jsonlite);
 ```{r}
 # global values
 base_url_records <- "https://records.nhl.com/site/api"
-base_url_stats <- "https://statsapi.web.nhl.com/api/v1"
+base_url_stats <- "https://statsapi.web.nhl.com/api/v1/teams"
 
 
 ```
@@ -50,7 +50,7 @@ getAllFranchises <- function(...) {
   res <- content(GET(full_url), as="text")
   resR <- fromJSON(res, flatten=TRUE)
   
-  print(resR)
+  return(resR)
 }
 
 getTeamTotals <- function(...) {
@@ -60,27 +60,171 @@ getTeamTotals <- function(...) {
   res <- content(GET(full_url), as="text")
   resR <- fromJSON(res, flatten=TRUE)
   
-  print(resR)
+  return(resR)
 }
 
 
-getFranchise <- function(identifier,...) {
-  
+getFranchiseSeasonRecords <- function(identifier,...) {
+
   if (!is.character(identifier) && !is.numeric(identifier)) {
     stop("Invalid input type, please use either a character or number")
   }
-  tab_name <- "franchises"
-  full_url <- paste0(base_url, "/", tab_name, "/", as.character(identifier))
   
+  
+  tab_name <- "franchise-season-records?cayenneExp=franchiseId="
+  full_url <- paste0(base_url_records, "/", tab_name, as.character(teamID))
+
+  print(full_url)
+  res <- content(GET(full_url), as="text")
+  resR <- fromJSON(res, flatten=TRUE)
+
+  return(resR)
+}
+
+getGoalieRecords <- function(identifier,...) {
+
+  if (!is.character(identifier) && !is.numeric(identifier)) {
+    stop("Invalid input type, please use either a character or number")
+  }
+  
+  
+  tab_name <- "franchise-goalie-records?cayenneExp=franchiseId="
+  full_url <- paste0(base_url_records, "/", tab_name, as.character(teamID))
+
+  print(full_url)
+  res <- content(GET(full_url), as="text")
+  resR <- fromJSON(res, flatten=TRUE)
+
+  return(resR)
+}
+
+getSkaterRecords <- function(identifier,...) {
+
+  if (!is.character(identifier) && !is.numeric(identifier)) {
+    stop("Invalid input type, please use either a character or number")
+  }
+  
+  
+  tab_name <- "franchise-skater-records?cayenneExp=franchiseId="
+  full_url <- paste0(base_url_records, "/", tab_name, as.character(teamID))
+
+  print(full_url)
   res <- content(GET(full_url), as="text")
   resR <- fromJSON(res, flatten=TRUE)
   
-  print(resR)
+  return(resR)
 }
 
+```
 
-getAllFranchises()
-getTeamTotals()
+```{r}
+getTeam <- function(options=NULL, teamID=NULL, statType=NULL, season=NULL, ...) {
+  
+  tab_name <- "?"
+  params <- ""
+  
+  if (!is.vector(options) && !is.null(options)) {
+    stop('Options, must be a vector of the following (roster, names, previousGame, nextGame, stats, season)')
+  }
+  
+  if (!is.character(season) && !is.numeric(season) && !is.null(season)) {
+    stop("Invalid input type, season must be in the form of two four digit years i.e. 20142015")
+  } else if(!is.null(season)) {
+    params <- paste0(params, "expand=team.roster&season=",as.character(season),"&")
+  }
+  
+  if (!is.character(statType) && !is.null(statType)) {
+    stop("Invalid input type, statType must be a character string")
+  } else if (!is.null(statType)) {
+    params <- paste0(params, "stats=",statType,"&")
+  }
+  
+  if (!is.character(teamID) && !is.numeric(teamID) && !is.null(teamID)) {
+    stop("Invalid input type, teamID must be a numeric value")
+  } else if (!is.null(teamID)){
+    params <- paste0(params, "teamId=",as.character(teamID),"&")
+  }
+  
+  
+  if ('roster' %in% options) {
+    params <- paste0(params, "expand=team.roster&")
+  }
+  if ('names' %in% options) {
+    params <- paste0(params, "expand=person.names&")
+  }
+  if ('nextGame' %in% options) {
+    params <- paste0(params, "expand=team.schedule.next&")
+  }
+  if ('previousGame' %in% options) {
+    params <- paste0(params, "expand=team.schedule.previous&") 
+  }
+  if ('stats' %in% options) {
+    params <- paste0(params, "expand=team.stats&")
+  }
+
+
+  full_url <- paste0(base_url_stats, "/", tab_name, params)
+    
+print(full_url)
+  res <- content(GET(full_url), as="text")
+  resR <- fromJSON(res, flatten=TRUE)
+  return(resR)
+}
+```
+
+```{r}
+## Wrapper Function
+## Identifier can be either the TeamID or Team Name
+## Note that the TeamID is different across the two APIs, so if the same TeamID is used information for different teams will result in the infoType==teamStats and the rest of the infoType options
+
+getInfo <- function(infoType, identifier=1, options=NULL, statType=NULL, season=NULL, ...) {
+  
+  if(!(infoType %in% c('franchise', 'teamTotals', 'seasonRecords', 'goalieRecords', 'skaterRecords','teamStats'))) {
+    stop('No such api endpoint found, options are: franchise, teamTotals, seasonRecords, goalieRecords, skaterRecords, teamStats')
+  }
+  
+  if(infoType == 'franchise') {
+    return(getAllFranchises())
+  } else if(infoType == 'teamTotals') {
+    return(getTeamTotals())
+  } else if(infoType %in% c('seasonRecords', 'goalieRecords', 'skaterRecords')) {
+    if (is.character(identifier)) {
+      franchiseDF <- getAllFranchises()[[1]]
+      subsettedFranchiseTable <- franchiseDF %>% subset(teamCommonName==identifier)
+      teamID <- subsettedFranchiseTable$id
+      if(length(teamID) == 0) {
+        stop("No team found for identifier")
+      }
+    } else {
+      teamID = identifier
+    }
+    if(infoType == 'seasonRecords') {
+      return(getFranchiseSeasonRecords(teamID))  
+    } else if(infoType == 'goalieRecords') {
+      return(getGoalieRecords(teamID)) 
+    } else if(infoType == 'skaterRecords') {
+      return(getSkaterRecords(teamID))
+    }
+    
+  } else if(infoType == 'teamStats') {
+    if (is.character(identifier)) {
+      allTeams <- getTeam()
+      subsettedTeamsTable <- allTeams[[2]] %>% subset(teamName==identifier)
+      teamID <- subsettedTeamsTable$id
+      if(length(teamID) == 0) {
+        stop("No team found for identifier")
+      }
+    } else {
+      teamID = identifier
+    }
+    return(getTeam(options=options, teamID=teamID, statType=statType, season=season))
+  }
+  
+}
+
+# getInfo(infoType='seasonRecords', identifier='Maple Leafs')
+# getInfo(infoType='teamStats', identifier='Maple Leafs', season=20142015)
+getInfo(infoType='teamStats', identifier=10, season=20142015)
 
 ```
 
