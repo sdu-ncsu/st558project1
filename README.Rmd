@@ -27,22 +27,20 @@ Github pages is address is <https://sdu-ncsu.github.io/st558project1/>
 library(tidyverse)
 library(httr)
 library(jsonlite);
+library(RSQLite);
 ```
 
-
+## Set the libraries needed
 ```{r}
 # global values
 base_url_records <- "https://records.nhl.com/site/api"
 base_url_stats <- "https://statsapi.web.nhl.com/api/v1/teams"
-
-
 ```
 
 
-
+## Create Functions for https://records.nhl.com/site/api
 ```{r}
-# franchise api function creation
-
+# Get all the franchises
 getAllFranchises <- function(...) {
   tab_name <- "franchise"
   full_url <- paste0(base_url_records, "/", tab_name)
@@ -53,6 +51,7 @@ getAllFranchises <- function(...) {
   return(resR)
 }
 
+# Get all the team totals
 getTeamTotals <- function(...) {
   tab_name <- "franchise-team-totals"
   full_url <- paste0(base_url_records, "/", tab_name)
@@ -63,52 +62,53 @@ getTeamTotals <- function(...) {
   return(resR)
 }
 
-
+# Get franchise season records
 getFranchiseSeasonRecords <- function(identifier,...) {
 
   if (!is.character(identifier) && !is.numeric(identifier)) {
-    stop("Invalid input type, please use either a character or number")
+    stop("Invalid identifier type, please specify a character or number")
   }
+  
+  teamID = identifier
   
   
   tab_name <- "franchise-season-records?cayenneExp=franchiseId="
   full_url <- paste0(base_url_records, "/", tab_name, as.character(teamID))
 
-  print(full_url)
   res <- content(GET(full_url), as="text")
   resR <- fromJSON(res, flatten=TRUE)
 
   return(resR)
 }
 
+# Get goalie records for a particular team
 getGoalieRecords <- function(identifier,...) {
 
   if (!is.character(identifier) && !is.numeric(identifier)) {
-    stop("Invalid input type, please use either a character or number")
+    stop("Invalid identifier type, please specify a character or number")
   }
-  
+  teamID = identifier
   
   tab_name <- "franchise-goalie-records?cayenneExp=franchiseId="
   full_url <- paste0(base_url_records, "/", tab_name, as.character(teamID))
 
-  print(full_url)
   res <- content(GET(full_url), as="text")
   resR <- fromJSON(res, flatten=TRUE)
 
   return(resR)
 }
 
+# Get skater records for particular team
 getSkaterRecords <- function(identifier,...) {
 
   if (!is.character(identifier) && !is.numeric(identifier)) {
-    stop("Invalid input type, please use either a character or number")
+    stop("Invalid identifier type, please specify a character or number")
   }
-  
+  teamID = identifier
   
   tab_name <- "franchise-skater-records?cayenneExp=franchiseId="
   full_url <- paste0(base_url_records, "/", tab_name, as.character(teamID))
 
-  print(full_url)
   res <- content(GET(full_url), as="text")
   resR <- fromJSON(res, flatten=TRUE)
   
@@ -117,6 +117,8 @@ getSkaterRecords <- function(identifier,...) {
 
 ```
 
+## This function his the endpoint https://statsapi.web.nhl.com/api/v1/teams
+### Options (roster, names, previousGame, nextGame, stats, season), teamID, statType, and season encompass the various parameters in the requirements
 ```{r}
 getTeam <- function(options=NULL, teamID=NULL, statType=NULL, season=NULL, ...) {
   
@@ -165,19 +167,20 @@ getTeam <- function(options=NULL, teamID=NULL, statType=NULL, season=NULL, ...) 
 
   full_url <- paste0(base_url_stats, "/", tab_name, params)
     
-print(full_url)
   res <- content(GET(full_url), as="text")
   resR <- fromJSON(res, flatten=TRUE)
   return(resR)
 }
 ```
 
+## Wrapper function
+### Identifier can be either the TeamID or Team Name
+### Note that the TeamID is different across the two APIs, so if the same TeamID is used information for different teams will result in the infoType==teamStats and the rest of the infoType options
 ```{r}
 ## Wrapper Function
-## Identifier can be either the TeamID or Team Name
-## Note that the TeamID is different across the two APIs, so if the same TeamID is used information for different teams will result in the infoType==teamStats and the rest of the infoType options
 
-getInfo <- function(infoType, identifier=1, options=NULL, statType=NULL, season=NULL, ...) {
+
+getInfo <- function(infoType, identifier=NULL, options=NULL, statType=NULL, season=NULL, ...) {
   
   if(!(infoType %in% c('franchise', 'teamTotals', 'seasonRecords', 'goalieRecords', 'skaterRecords','teamStats'))) {
     stop('No such api endpoint found, options are: franchise, teamTotals, seasonRecords, goalieRecords, skaterRecords, teamStats')
@@ -201,6 +204,7 @@ getInfo <- function(infoType, identifier=1, options=NULL, statType=NULL, season=
     if(infoType == 'seasonRecords') {
       return(getFranchiseSeasonRecords(teamID))  
     } else if(infoType == 'goalieRecords') {
+      print(teamID)
       return(getGoalieRecords(teamID)) 
     } else if(infoType == 'skaterRecords') {
       return(getSkaterRecords(teamID))
@@ -224,7 +228,109 @@ getInfo <- function(infoType, identifier=1, options=NULL, statType=NULL, season=
 
 # getInfo(infoType='seasonRecords', identifier='Maple Leafs')
 # getInfo(infoType='teamStats', identifier='Maple Leafs', season=20142015)
-getInfo(infoType='teamStats', identifier=10, season=20142015)
+# getInfo(infoType='teamStats', identifier=10, season=20142015)
 
 ```
+
+## At some point you should do a join on two returned datasets from different API endpoints (say combine them according to franchise ID)
+
+```{r}
+allTeams= getInfo(infoType='teamStats')
+allTeamsDF <- allTeams$teams %>% rename(franchiseName = name)
+
+MapleLeafGoaliesDF = getInfo(infoType='goalieRecords',identifier='Maple Leafs')$data
+RangerGoaliesDF = getInfo(infoType='goalieRecords',identifier='Rangers')$data
+RedWingsDF = getInfo(infoType='goalieRecords',identifier='Red Wings')$data
+
+allGoalies = rbind(RangerGoaliesDF, MapleLeafGoaliesDF, RedWingsDF)
+
+joinedAllGoalies <- inner_join(allTeamsDF, allGoalies, by="franchiseName")
+```
+
+## You should create at least two new variables
+```{r}
+joinedAllGoalies <- joinedAllGoalies %>% mutate(mShotsmWinsRatio = mostGoalsAgainstOneGame/mostWinsOneSeason, mostSavesSeasonsRatio = mostSavesOneGame/seasons)
+```
+
+
+
+```{r}
+MapleLeafRecords <- getInfo(infoType='seasonRecords', identifier='Maple Leafs')$data
+
+teamTotals <- getInfo(infoType='teamTotals' )$data
+allFranchises <- getInfo(infoType='franchise')$data
+```
+
+## You should create some contingency tables
+
+```{r}
+table(allTeamsDF$division.abbreviation, allTeamsDF$conference.name)
+table(allTeamsDF$venue.timeZone.tz, allTeamsDF$division.nameShort)
+```
+
+## You should create numerical summaries for some quantitative variables at each setting of some of your categorical variables
+
+```{r}
+
+
+reducedGoalies1 <- allGoalies %>% select(franchiseName, mostSavesOneGame)
+reducedGoalies2 <- allGoalies %>% select(activePlayer, mostWinsOneSeason)
+reducedGoalies3 <- allGoalies %>% mutate('GreaterThanTenSeasons'= case_when(allGoalies$seasons>10 ~ TRUE, allGoalies$seasons <= 10 ~ FALSE)) %>% select(GreaterThanTenSeasons, mostGoalsAgainstOneGame)
+
+mostSavesStats <- reducedGoalies1 %>% group_by(franchiseName) %>%  summarise( 
+            n = n(),
+            min = fivenum(mostSavesOneGame)[1],
+            Q1 = fivenum(mostSavesOneGame)[2],
+            median = fivenum(mostSavesOneGame)[3],
+            Q3 = fivenum(mostSavesOneGame)[4],
+            max = fivenum(mostSavesOneGame)[5]);
+
+
+mostWinsStats <- reducedGoalies2 %>% group_by(activePlayer) %>%  summarise( 
+            n = n(),
+            min = fivenum(mostWinsOneSeason)[1],
+            Q1 = fivenum(mostWinsOneSeason)[2],
+            median = fivenum(mostWinsOneSeason)[3],
+            Q3 = fivenum(mostWinsOneSeason)[4],
+            max = fivenum(mostWinsOneSeason)[5]);
+
+
+experienceMostGoalsAgainst <- reducedGoalies3 %>% group_by(GreaterThanTenSeasons) %>%  summarise( 
+            n = n(),
+            min = fivenum(mostGoalsAgainstOneGame)[1],
+            Q1 = fivenum(mostGoalsAgainstOneGame)[2],
+            median = fivenum(mostGoalsAgainstOneGame)[3],
+            Q3 = fivenum(mostGoalsAgainstOneGame)[4],
+            max = fivenum(mostGoalsAgainstOneGame)[5]);
+
+
+kable(mostSavesStats)
+kable(mostWinsStats)
+kable(experienceMostGoalsAgainst)
+```
+
+## You should create at least five plots utilizing coloring, grouping, etc. All plots should have nice labels and titles.
+
+### You should have at least one bar plot, one histogram, one box plot, and one scatter plot
+
+
+```{r}
+g1 <- ggplot(joinedAllGoalies, aes(x = franchiseName, y = gamesPlayed))
+g1 + geom_boxplot(fill = "white") +geom_point(aes(colour=franchiseName), position = "jitter") + ggtitle('Boxplot for Number of Games Played')
+
+g2 <- ggplot(joinedAllGoalies, aes(x=mostGoalsAgainstOneGame))
+g2 + geom_histogram(aes(y=..density..),binwidth = .5) + geom_density(lwd=2, adjust=.4, color='red') + ggtitle('Histogram for Most Goals Against') + ylab('Density')
+
+g3 <- ggplot(joinedAllGoalies %>% mutate('activePlayer'= case_when(joinedAllGoalies$activePlayer == TRUE ~ 'Active', joinedAllGoalies$activePlayer == FALSE ~ 'Inactive')), aes(x = activePlayer))
+g3 + stat_count() +xlab("Active Players")
+
+g4 <- ggplot(joinedAllGoalies, aes(x = seasons, y = mostShotsAgainstOneGame, colour=franchiseName )) 
+g4 + geom_point() + ggtitle('Most Shots Against in a Game')
+
+g5 <- ggplot(joinedAllGoalies, aes(x=mShotsmWinsRatio))
+g5 + geom_histogram(aes(y=..density..),binwidth = .19) + ggtitle('Most Shots Against vs Most Wins in One Season Ratio') + facet_wrap(~ franchiseName) + ylab('Density') +xlab('Ratio of Most Shots Against in One Game vs Most Games Won in One Season')
+
+```
+
+
 
