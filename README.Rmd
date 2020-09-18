@@ -7,28 +7,7 @@ output: rmarkdown::github_document
 
 # Project 1
 
-## Explaining what you did in the project and any findings you made.
-
-### See individual sections
-
-## You should also reflect on the process you went through for this project. Discuss things like:
-
-### What would you do differently in approaching the project?
-
-### I would have a better plan for what data to use and what kinds of graphs and tables to make with the data.
-
-### what was the most difficult part of the logic and programming for you?
-
-### Remembering the different kinds of R data tyopes and various graphing options was challening.
-
-### what are your big take-aways for future projects?
-
-### My main takeaway is to look at the data a bit more before trying to figure out what to do with it in order to create more meaning representations.
-
-### In your blog post, provide a link to your github pages repo
-
-Repo is <https://github.com/sdu-ncsu/st558project1.git>.
-Github pages is address is <https://sdu-ncsu.github.io/st558project1/>
+## Set the libraries needed
 
 ```{r message=FALSE, warning=FALSE}
 # devtools::install_github("r-dbi/bigrquery")
@@ -36,9 +15,8 @@ library(tidyverse)
 library(httr)
 library(jsonlite);
 library(RSQLite);
+library(kableExtra);
 ```
-
-## Set the libraries needed
 
 ### These were the two URLS for the two APIs
 
